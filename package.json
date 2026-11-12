@@ -1,0 +1,40 @@
+{
+  "name": "@oneschema/pdfium-wasm",
+  "version": "8152.0.0",
+  "description": "PDFium compiled to WebAssembly (bblanchon/pdfium-binaries), as an ES module that loads without file or network access",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oneschema/pdfium-wasm.git"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./loader": {
+      "types": "./dist/loader.d.ts",
+      "default": "./dist/loader.js"
+    },
+    "./pdfium.wasm": "./dist/pdfium.wasm"
+  },
+  "files": [
+    "dist",
+    "licenses",
+    "LICENSE.md",
+    "VERSION",
+    "args.gn"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

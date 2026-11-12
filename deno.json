@@ -1,0 +1,23 @@
+{
+  "nodeModulesDir": "none",
+  "imports": {
+    "@std/assert": "jsr:@std/assert@1.0.19"
+  },
+  "tasks": {
+    "test": "deno test --no-prompt --frozen --allow-read=test,release.json test/"
+  },
+  "lint": {
+    "exclude": [
+      "dist/"
+    ]
+  },
+  "fmt": {
+    "exclude": [
+      "dist/",
+      "licenses/"
+    ],
+    "lineWidth": 100,
+    "semiColons": false,
+    "proseWrap": "never"
+  }
+}
