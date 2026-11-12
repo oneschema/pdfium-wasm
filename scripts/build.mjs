@@ -4,15 +4,7 @@
 //   node scripts/build.mjs [--tarball path/to/pdfium-wasm.tgz]
 import { execFileSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import {
-  cpSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs"
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
