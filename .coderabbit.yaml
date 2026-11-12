@@ -1,0 +1,84 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+
+# Allow free-tier summaries for GitHub users who don't have a paid
+# CodeRabbit seat, so every contributor still gets review feedback.
+enable_free_tier: true
+
+tone_instructions: |
+  Prioritize real bugs, security issues, correctness, and behavioral regressions. Skip stylistic nitpicks, micro-optimizations, and naming bikesheds unless they cause a bug. Be concise.
+
+reviews:
+  profile: chill
+  request_changes_workflow: true
+
+  high_level_summary: true
+  high_level_summary_placeholder: "@coderabbitai summary"
+  high_level_summary_in_walkthrough: true
+  review_details: true
+  collapse_walkthrough: false
+  changed_files_summary: true
+  sequence_diagrams: false
+  estimate_code_review_effort: true
+
+  poem: false
+  in_progress_fortune: false
+  review_status: true
+  commit_status: true
+
+  # dist/, licenses/, VERSION and args.gn are generated from the upstream
+  # release by scripts/build.mjs and are not committed.
+  path_filters:
+    - "!**/*.lock"
+    - "!**/node_modules/**"
+    - "!dist/**"
+    - "!licenses/**"
+
+  path_instructions:
+    - path: "**"
+      instructions: |
+        ## Focus on new code
+
+        Focus review comments on genuinely **new code and behavior** introduced by the PR. Do NOT flag pre-existing patterns, conventions, or idioms that already exist in the surrounding codebase — even if they appear in the diff context or were moved/reformatted.
+
+        ## Do not create chat-based learnings
+
+        Do NOT create new CodeRabbit "learnings" from chat replies on this repository. If a reviewer's reply would otherwise become a learning, suggest a concrete edit to `README.md` or this config instead, and let the human open a PR.
+    - path: "scripts/build.mjs"
+      instructions: |
+        The build must use the upstream bblanchon/pdfium-binaries `pdfium.wasm` and `pdfium.js` byte for byte, verified against the SHA-256 values in `release.json`. Flag any change that skips or weakens a hash check, or edits the upstream glue instead of wrapping it.
+    - path: ".github/workflows/**"
+      instructions: |
+        Publishing uses npm trusted publishing (OIDC) with provenance. Only the job in the `release` environment may have `id-token: write`; build and test jobs must stay credential-free. Flag any `registry-url`, `NODE_AUTH_TOKEN`, or long-lived npm token, and any action not pinned to a full commit SHA.
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    auto_pause_after_reviewed_commits: 10
+    # Review only PRs that are ready for review; draft iterations must not consume the per-developer Fair Usage review allowance
+    drafts: false
+    base_branches:
+      - ".*"
+    ignore_title_keywords:
+      - "DO NOT MERGE"
+      - "[skip review]"
+    ignore_usernames:
+      - "dependabot[bot]"
+      - "renovate[bot]"
+      - "github-actions[bot]"
+
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+    simplify:
+      enabled: false
+
+knowledge_base:
+  # Keep learnings scoped to this repository only.
+  learnings:
+    scope: local
+
+chat:
+  auto_reply: true
