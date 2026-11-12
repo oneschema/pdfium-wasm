@@ -118,7 +118,7 @@ try {
 }
 
 // The glue is a classic script that picks Node, browser or worker by looking at globals. Shadowing
-// `process`, `require` and `window` makes it take the plain path under Node and Deno, so it never
+// `process`, `require` and `window` makes it take the plain path in any runtime, so it never
 // reads files or fetches: the caller passes `wasmBinary`. `wasmExports.malloc`/`free` are the
 // names `@hyzyla/pdfium`'s `PDFiumLibrary.initBase` expects.
 function loaderSource(glue) {

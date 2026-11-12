@@ -1,5 +1,5 @@
-// Runs with read access to test/ only, so the loader must not read dist/pdfium.wasm or the npm
-// cache (Deno's static imports are not permission-checked; file reads are).
+// Runs with read access to test/ and release.json only, so the loaders must not read
+// dist/pdfium.wasm or any other file.
 import { assert, assertEquals, assertRejects } from "@std/assert"
 import loadInlinePdfium, { wasmBinary } from "../dist/index.js"
 import loadPdfium from "../dist/loader.js"
