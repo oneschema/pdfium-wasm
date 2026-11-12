@@ -70,7 +70,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          persist-credentials: true
+          persist-credentials: false
 
       # No `registry-url`: it writes an `_authToken` line that makes npm skip the OIDC exchange.
       - name: Set up Node.js
@@ -87,13 +87,25 @@ jobs:
         if: needs.verify.outputs.publish == 'true'
         run: npm publish --provenance --access public
 
+      # A tag-only rerun tags the commit npm recorded as `gitHead` for the published version, not
+      # the current checkout, so the tag always points at the source that was published.
       - name: Tag the release
         env:
           VERSION: ${{ needs.verify.outputs.version }}
+          PUBLISHED_NOW: ${{ needs.verify.outputs.publish }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null; then
             echo "v${VERSION} already exists"
-          else
-            git tag "v${VERSION}"
-            git push origin "v${VERSION}"
+            exit 0
           fi
+          if [ "${PUBLISHED_NOW}" = "true" ]; then
+            sha="${GITHUB_SHA}"
+          else
+            sha="$(npm view "@oneschema/pdfium-wasm@${VERSION}" gitHead)"
+            if ! [[ "${sha}" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::npm has no gitHead for ${VERSION}; tag v${VERSION} by hand"
+              exit 1
+            fi
+          fi
+          gh api "repos/${GITHUB_REPOSITORY}/git/refs" -f ref="refs/tags/v${VERSION}" -f sha="${sha}"
