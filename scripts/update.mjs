@@ -6,12 +6,13 @@ import { createHash } from "node:crypto"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 const tag = process.argv[2]
 const build = tag?.match(/^chromium\/(\d+)$/)?.[1]
 if (!build) throw new Error("usage: node scripts/update.mjs chromium/<build>")
 
-const root = new URL("..", import.meta.url).pathname
+const root = fileURLToPath(new URL("..", import.meta.url))
 const url = `https://github.com/bblanchon/pdfium-binaries/releases/download/${
   encodeURIComponent(tag)
 }/pdfium-wasm.tgz`

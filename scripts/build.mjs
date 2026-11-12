@@ -7,8 +7,9 @@ import { createHash } from "node:crypto"
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 
-const root = new URL("..", import.meta.url).pathname
+const root = fileURLToPath(new URL("..", import.meta.url))
 const release = JSON.parse(readFileSync(join(root, "release.json"), "utf8"))
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"))
 
