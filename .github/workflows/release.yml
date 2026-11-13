@@ -1,0 +1,111 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # Builds and tests without publish credentials, write scopes or `id-token`, so nothing this job
+  # runs can mint an npm provenance token.
+  verify:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      publish: ${{ steps.published.outputs.publish }}
+      version: ${{ steps.published.outputs.version }}
+      tagged: ${{ steps.published.outputs.tagged }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ^24.22.1
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.9.x
+
+      - name: Build and test
+        run: node scripts/build.mjs && deno task test
+
+      - name: Check whether this version is already on npm and tagged
+        id: published
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          if npm view "@oneschema/pdfium-wasm@${version}" version >/dev/null 2>&1; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v${version}" >/dev/null; then
+            echo "tagged=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tagged=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  release:
+    needs: verify
+    # Also runs when an earlier run published but failed to push the tag.
+    if: needs.verify.outputs.publish == 'true' || needs.verify.outputs.tagged == 'false'
+    runs-on: ubuntu-24.04
+    # npm's trusted publisher for @oneschema/pdfium-wasm requires this environment, which only
+    # allows `main`.
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # No `registry-url`: it writes an `_authToken` line that makes npm skip the OIDC exchange.
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ^24.22.1
+
+      - name: Build from the pinned release
+        if: needs.verify.outputs.publish == 'true'
+        run: node scripts/build.mjs
+
+      # npm authenticates through its trusted publisher for this workflow and attests provenance.
+      - name: Publish
+        if: needs.verify.outputs.publish == 'true'
+        run: npm publish --provenance --access public
+
+      # A tag-only rerun tags the commit npm recorded as `gitHead` for the published version, not
+      # the current checkout, so the tag always points at the source that was published.
+      - name: Tag the release
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          PUBLISHED_NOW: ${{ needs.verify.outputs.publish }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null; then
+            echo "v${VERSION} already exists"
+            exit 0
+          fi
+          if [ "${PUBLISHED_NOW}" = "true" ]; then
+            sha="${GITHUB_SHA}"
+          else
+            sha="$(npm view "@oneschema/pdfium-wasm@${VERSION}" gitHead)"
+            if ! [[ "${sha}" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::npm has no gitHead for ${VERSION}; tag v${VERSION} by hand"
+              exit 1
+            fi
+          fi
+          gh api "repos/${GITHUB_REPOSITORY}/git/refs" -f ref="refs/tags/v${VERSION}" -f sha="${sha}"

@@ -1,0 +1,6 @@
+/dist/
+/licenses/
+/VERSION
+/args.gn
+/.cache/
+*.tgz
