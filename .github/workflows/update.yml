@@ -1,0 +1,125 @@
+name: Update PDFium
+
+# Moves release.json and package.json to bblanchon/pdfium-binaries' latest `chromium/<build>`
+# release and lands it, so `release.yml` publishes the new version to npm.
+#
+# The GitHub App writes the branch and the pull request and enables auto-merge, so CI runs on the
+# pull request and the squash merge triggers `release.yml`; neither happens for writes made with
+# GITHUB_TOKEN. The App cannot approve its own pull request, so the job's GITHUB_TOKEN gives the
+# one approval the `main` ruleset requires, for the head the App pushed. The required `build`
+# check still gates the merge.
+
+on:
+  schedule:
+    # Wednesdays at 16:00 UTC; bblanchon/pdfium-binaries usually releases early in the week.
+    - cron: "0 16 * * 3"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, e.g. chromium/8152 (blank for the latest release)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write # approve the App's pull request
+
+concurrency:
+  group: update-pdfium
+  cancel-in-progress: false
+
+env:
+  BRANCH_NAME: update/pdfium
+
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Create GitHub App installation token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.ONESCHEMA_DEV_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ONESCHEMA_DEV_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ^24.22.1
+
+      - name: Pick the release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          tag="${INPUT_TAG:-$(gh api repos/bblanchon/pdfium-binaries/releases/latest --jq .tag_name)}"
+          if ! [[ "${tag}" =~ ^chromium/([0-9]+)$ ]]; then
+            echo "::error::Unexpected release tag: ${tag}"
+            exit 1
+          fi
+          build="${BASH_REMATCH[1]}"
+          current="$(node -p 'require("./release.json").tag.split("/")[1]')"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "build=${build}" >> "$GITHUB_OUTPUT"
+          if [ "${build}" -le "${current}" ]; then
+            echo "chromium/${current} is already at or past ${tag}"
+            echo "update=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Updating chromium/${current} to ${tag}"
+            echo "update=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update release.json and package.json
+        if: steps.release.outputs.update == 'true'
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: node scripts/update.mjs "${TAG}"
+
+      - name: Open the pull request and enable auto-merge
+        if: steps.release.outputs.update == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REVIEWER_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.release.outputs.tag }}
+          BUILD: ${{ steps.release.outputs.build }}
+        run: |
+          set -euo pipefail
+          title="feat: update PDFium to ${TAG}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          gh auth setup-git
+          git checkout -B "${BRANCH_NAME}"
+          git add release.json package.json
+          git commit -m "${title}"
+          git push --force origin "${BRANCH_NAME}"
+          head="$(git rev-parse HEAD)"
+
+          body="$(mktemp)"
+          cat > "${body}" <<BODY
+          Moves \`release.json\` and \`package.json\` to [bblanchon/pdfium-binaries ${TAG}](https://github.com/bblanchon/pdfium-binaries/releases/tag/${TAG}), published to npm as \`@oneschema/pdfium-wasm@${BUILD}.0.0\` once this merges.
+
+          Opened by \`.github/workflows/update.yml\`, which approves it and enables auto-merge; the required \`build\` check gates the merge.
+          BODY
+
+          if pr="$(gh pr view "${BRANCH_NAME}" --repo "${REPO}" --json number,state --jq 'select(.state == "OPEN") | .number')" && [ -n "${pr}" ]; then
+            gh pr edit "${pr}" --repo "${REPO}" --title "${title}" --body-file "${body}"
+          else
+            pr="$(gh pr create --repo "${REPO}" --base main --head "${BRANCH_NAME}" --title "${title}" --body-file "${body}")"
+          fi
+
+          GH_TOKEN="${REVIEWER_TOKEN}" gh api "repos/${REPO}/pulls/${pr##*/}/reviews" \
+            -f event=APPROVE -f commit_id="${head}" \
+            -f body="Approved by the update-pdfium workflow: the release hashes are recorded in release.json." \
+            >/dev/null
+          gh pr merge "${pr}" --repo "${REPO}" --auto --squash --match-head-commit "${head}"
