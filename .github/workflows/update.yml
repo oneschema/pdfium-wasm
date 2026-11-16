@@ -11,8 +11,8 @@ name: Update PDFium
 
 on:
   schedule:
-    # Wednesdays at 16:00 UTC; bblanchon/pdfium-binaries usually releases early in the week.
-    - cron: "0 16 * * 3"
+    # Daily at 16:00 UTC. A run with nothing new to land changes nothing.
+    - cron: "0 16 * * *"
   workflow_dispatch:
     inputs:
       tag:
@@ -102,8 +102,14 @@ jobs:
           git checkout -B "${BRANCH_NAME}"
           git add release.json package.json
           git commit -m "${title}"
-          git push --force origin "${BRANCH_NAME}"
-          head="$(git rev-parse HEAD)"
+          # A pending update already on the branch keeps its head, so CI and the approval stand.
+          if git fetch --depth=1 origin "${BRANCH_NAME}" && git diff --quiet FETCH_HEAD HEAD; then
+            head="$(git rev-parse FETCH_HEAD)"
+            echo "${BRANCH_NAME} already holds this update at ${head}"
+          else
+            git push --force origin "${BRANCH_NAME}"
+            head="$(git rev-parse HEAD)"
+          fi
 
           body="$(mktemp)"
           cat > "${body}" <<BODY
@@ -118,8 +124,14 @@ jobs:
             pr="$(gh pr create --repo "${REPO}" --base main --head "${BRANCH_NAME}" --title "${title}" --body-file "${body}")"
           fi
 
-          GH_TOKEN="${REVIEWER_TOKEN}" gh api "repos/${REPO}/pulls/${pr##*/}/reviews" \
-            -f event=APPROVE -f commit_id="${head}" \
-            -f body="Approved by the update-pdfium workflow: the release hashes are recorded in release.json." \
-            >/dev/null
-          gh pr merge "${pr}" --repo "${REPO}" --auto --squash --match-head-commit "${head}"
+          approved="$(GH_TOKEN="${REVIEWER_TOKEN}" gh api --paginate "repos/${REPO}/pulls/${pr##*/}/reviews" \
+            --jq ".[] | select(.state == \"APPROVED\" and .commit_id == \"${head}\" and .user.login == \"github-actions[bot]\") | .id")"
+          if [ -z "${approved}" ]; then
+            GH_TOKEN="${REVIEWER_TOKEN}" gh api "repos/${REPO}/pulls/${pr##*/}/reviews" \
+              -f event=APPROVE -f commit_id="${head}" \
+              -f body="Approved by the update-pdfium workflow: the release hashes are recorded in release.json." \
+              >/dev/null
+          fi
+          if [ "$(gh pr view "${pr}" --repo "${REPO}" --json autoMergeRequest --jq '.autoMergeRequest != null')" != "true" ]; then
+            gh pr merge "${pr}" --repo "${REPO}" --auto --squash --match-head-commit "${head}"
+          fi
