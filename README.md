@@ -28,7 +28,7 @@ node scripts/update.mjs chromium/<build>   # downloads the release, records its 
 node scripts/build.mjs && deno task test   # tests run under Deno
 ```
 
-`.github/workflows/update.yml` does this every Wednesday for bblanchon's latest release (or a `tag` given to a manual run): it opens a PR with the `release.json` and `package.json` changes, approves it and enables auto-merge, so the PR lands once the `build` check passes. Merging to `main` publishes the new version to npm through trusted publishing with provenance (`.github/workflows/release.yml`).
+`.github/workflows/update.yml` does this daily for bblanchon's latest release (or a `tag` given to a manual run): it opens a PR with the `release.json` and `package.json` changes, approves it and enables auto-merge, so the PR lands once the `build` check passes. Merging to `main` publishes the new version to npm through trusted publishing with provenance (`.github/workflows/release.yml`).
 
 ## Licenses
 
