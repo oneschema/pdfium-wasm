@@ -1,5 +1,5 @@
 {
-  "tag": "chromium/8152",
-  "tarball_sha256": "005bba72c9da3b7ce334c2b13270a3369831730b7dfb3b7088550c336f989bf1",
-  "wasm_sha256": "8f12dd340d93ce8e46044d74bbb1587eaa7044ef42622fa1072b1b8fb1acfb05"
+  "tag": "chromium/8165",
+  "tarball_sha256": "febcdebc11b2a015d3b7e3614085ca7bfd381deb76445a6949cf00966c9edf25",
+  "wasm_sha256": "c19a58d96a865015cb4a175c6bc1ee9744d64d3b7aa1b4d916779f6ca7d921b3"
 }
