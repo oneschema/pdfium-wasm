@@ -1,6 +1,6 @@
 {
   "name": "@oneschema/pdfium-wasm",
-  "version": "8165.0.0",
+  "version": "8179.0.0",
   "description": "PDFium compiled to WebAssembly (bblanchon/pdfium-binaries), as an ES module that loads without file or network access",
   "license": "SEE LICENSE IN LICENSE.md",
   "repository": {
